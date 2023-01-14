@@ -1,0 +1,149 @@
+function OBJ:Decode(file)
+	local Data = {}
+	Data.v = {}
+	Data.f = {}
+	Data.o = {}
+	Data.g = {}
+	Data.mtl = {}
+	Data.mtli = {}
+	
+	local Split = string.split(file, [[
+
+]])
+	for i,v in pairs (Split) do
+		local Spaced = string.split(v, " ")
+		if Spaced[1] == "v" then
+			if string.byte(Spaced[2]) == nil then
+				Spaced[2] = Spaced[3]; Spaced[3] = Spaced[4]; Spaced[4] = Spaced[5]
+			end
+			table.insert(Data.v, Vector3.new(Spaced[2], Spaced[3], Spaced[4]))
+		end
+		if Spaced[1] == "f" then
+			local NewSpaced = {}
+			for i = 2,#Spaced do
+				table.insert(NewSpaced, Spaced[i])
+			end
+			local FData = {}
+			for i,f in pairs (NewSpaced) do
+				local split = string.split(f, "/")
+				local n = tonumber(split[1])
+				if n then
+					n = n % (#Data.v + 1)
+					FData[i] = n
+				end
+			end
+			--[[
+			for i,v in pairs (NewSpaced) do
+				local split = string.split(v, " ")
+				local function slashtospace(id)
+					if string.match(split[id], "/") then
+						split[id] = string.split(split[id], "/")[1]
+						print(split[id])
+					end
+				end
+				for si = 1,#split do
+					slashtospace(si)
+				end
+				NewSpaced[i] = {tonumber(split[1]), tonumber(split[2]), tonumber(split[3])}
+				task.wait(.1)
+			end
+			Data.f[i] = NewSpaced
+			]]
+			table.insert(Data.f, FData)
+		end
+		if Spaced[1] == "o" then
+			Data.o[#Data.f+1] = Spaced[2]
+		end
+		if Spaced[1] == "g" then
+			Data.g[#Data.g+1] = Spaced[2]
+		end
+		if Spaced[1] == "usemtl" then -- can be paired with decodemtl for colors.
+			Data.mtl[Spaced[2]] = Color3.new(1, 1, 1)
+			Data.mtli[#Data.f+1] = Spaced[2]
+		end
+	end
+	
+	return Data
+end
+
+-- i did not include triangle drawer and some other stuff so it will make no sense so get owned
+
+local zumma = Instance.new("Model", script)
+function OBJ:Load(Data, Origin, scale, Mtl)
+	print("making obj")
+	game.Debris:AddItem(Utils:Create({"Hint", script}, {Text = "Loading model"}), 2)
+	local visvertices = {}
+	local scale = scale or 1
+	for i,v in pairs (Data.v) do
+		--[[
+		table.insert(visvertices, Utils:Create({"SpawnLocation", script}, {
+			Size = Vector3.one * .05,
+			Position = Origin + v,
+			Shape = "Ball",
+			Anchored = true,
+			Enabled = false
+		}))
+		]]
+		Data.v[i] = Origin + (v * scale)
+		--if i % 2 == 0 then task.wait() end
+	end
+	local tris = {}
+	local model = zumma
+	local gr = model
+	
+	local color = Color3.new(1, 1, 1)
+	for i,v in pairs (Data.f) do
+		--draw3dTriangle()
+		if Data.o[i] then
+			model = Utils:Create({"Model", script}, {Name = Data.g[i]})
+		end
+		if Data.g[i] then
+			gr = Utils:Create({"Model", model}, {Name = Data.g[i]})
+		end
+		if Mtl then
+			if Data.mtli[i] then
+				color = Mtl.mtl[Data.mtli[i]];
+			end
+		end
+		color = color or Color3.new(1, 1, 1)
+		local a, b, c = nil, nil, nil
+		for i = 1,#v do
+			if not a then
+				a = v[i]
+			elseif not b then
+				b = v[i]
+			elseif not c then
+				c = v[i]
+			elseif a and b and c then
+				local w1, w2 = draw3dTriangle(Data.v[a], Data.v[b], Data.v[c], gr)
+				w1.Parent = gr; w2.Parent = gr
+				w1.Color = color; w2.Color = color
+				--table.insert(tris, {Data.v[a], Data.v[b], Data.v[c]})
+				local d = v[i]
+				if d then
+					local oa, ob, oc = a, b,c
+					--a = c; b = b; c = d
+					local w1, w2 = draw3dTriangle(Data.v[c], Data.v[a], Data.v[d], gr)
+					w1.Parent = gr; w2.Parent = gr
+					w1.Color = color; w2.Color = color
+					--table.insert(tris, {Data.v[a], Data.v[b], Data.v[c]})
+				end
+				a = nil; b = nil; c = nil;
+			end
+		end
+		if a and b and c then
+			if #v % 3 == 0 then
+				local w1, w2 = draw3dTriangle(Data.v[a], Data.v[b], Data.v[c], gr)
+				w1.Parent = model; w2.Parent = model;
+				w1.Color = color; w2.Color = color
+				--table.insert(tris, {Data.v[a], Data.v[b], Data.v[c]})
+			end
+		end
+		if i % 6 == 0 then
+			task.wait()
+		end
+	end
+	game.Debris:AddItem(Utils:Create({"Hint", script}, {Text = "Finished loading model"}), 2)
+end
+
+return OBJ
